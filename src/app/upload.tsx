@@ -2,12 +2,12 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Image, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button } from '../lib/Button';
 import { formatSize, slugify, timestamp } from '../lib/files';
 import { uploadRecipe } from '../lib/github';
-import { prepareImage } from '../lib/image';
+import { base64Size, prepareImage } from '../lib/image';
 import { readFileAsBase64 } from '../lib/read-file';
 import { useSettings } from '../lib/settings';
 import { colors, common } from '../lib/theme';
@@ -16,13 +16,8 @@ import { colors, common } from '../lib/theme';
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
 
 type Selected =
-  | { kind: 'image'; previewUri: string; base64: string; size: number }
+  | { kind: 'image'; previewUri: string; base64: string; size: number; extension: string }
   | { kind: 'pdf'; name: string; base64: string; size: number };
-
-/** Tamanho em bytes do arquivo representado por uma string base64. */
-function base64Size(base64: string): number {
-  return Math.floor((base64.length * 3) / 4);
-}
 
 export default function UploadScreen() {
   const { settings } = useSettings();
@@ -36,8 +31,14 @@ export default function UploadScreen() {
     const asset = result.assets[0];
     setBusy('preparing');
     try {
-      const image = await prepareImage(asset.uri, asset.width);
-      setSelected({ kind: 'image', previewUri: image.uri, base64: image.base64, size: base64Size(image.base64) });
+      const image = await prepareImage(asset);
+      setSelected({
+        kind: 'image',
+        previewUri: image.uri,
+        base64: image.base64,
+        size: base64Size(image.base64),
+        extension: image.extension,
+      });
     } finally {
       setBusy(null);
     }
@@ -82,11 +83,13 @@ export default function UploadScreen() {
     setTitle((current) => current || asset.name.replace(/\.pdf$/i, ''));
   });
 
+  const missing = [!title.trim() && 'o nome da receita', !selected && 'uma foto ou um PDF'].filter(Boolean);
+
   const send = run(async () => {
-    if (!selected) return;
+    if (!selected || !title.trim()) throw new Error(`Falta informar ${missing.join(' e ')}.`);
     const slug = slugify(title);
-    if (!slug) throw new Error('Dê um nome para a receita.');
-    const extension = selected.kind === 'image' ? 'jpg' : 'pdf';
+    if (!slug) throw new Error('O nome da receita precisa ter pelo menos uma letra ou número.');
+    const extension = selected.kind === 'image' ? selected.extension : 'pdf';
     const folder = settings.folder.replace(/^\/+|\/+$/g, '');
     const path = `${folder ? folder + '/' : ''}${slug}-${timestamp()}.${extension}`;
 
@@ -132,7 +135,12 @@ export default function UploadScreen() {
       </View>
       <Button title="📕 Escolher PDF" variant="secondary" onPress={pickPdf} disabled={!!busy} />
 
-      {busy === 'preparing' && <Text style={common.hint}>Preparando arquivo...</Text>}
+      {busy === 'preparing' && (
+        <View style={[styles.row, styles.centerRow]}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={[common.hint, styles.flex]}>Preparando arquivo... fotos grandes podem levar alguns segundos.</Text>
+        </View>
+      )}
 
       {selected?.kind === 'image' && (
         <View style={common.card}>
@@ -152,9 +160,10 @@ export default function UploadScreen() {
       <Button
         title="Enviar para o GitHub"
         onPress={send}
-        disabled={!selected || !title.trim() || busy === 'preparing'}
+        disabled={busy === 'preparing'}
         loading={busy === 'sending'}
       />
+      {missing.length > 0 && !busy && <Text style={common.hint}>Falta: {missing.join(' e ')}.</Text>}
       <Text style={common.hint}>
         A receita será gravada em {settings.owner}/{settings.repo}
         {settings.folder ? `, na pasta "${settings.folder}"` : ''}, branch {settings.branch}.
@@ -165,6 +174,7 @@ export default function UploadScreen() {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 12 },
+  centerRow: { alignItems: 'center' },
   flex: { flex: 1 },
   preview: { width: '100%', height: 260, marginBottom: 8 },
   pdfName: { fontSize: 16, fontWeight: '600', color: colors.text },
