@@ -161,10 +161,7 @@ export default function UploadScreen() {
     return (
       <View style={common.centered}>
         <Text style={styles.bigIcon}>🔑</Text>
-        <Text style={[common.hint, styles.center]}>
-          Para enviar receitas o app precisa de um token do GitHub com permissão de escrita no repositório{' '}
-          {settings.owner}/{settings.repo}.
-        </Text>
+        <Text style={[common.hint, styles.center]}>Envio de receitas não configurado neste aparelho.</Text>
         <Button title="Configurar token" onPress={() => router.push('/settings')} />
       </View>
     );
