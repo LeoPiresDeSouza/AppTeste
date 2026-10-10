@@ -48,15 +48,20 @@ export default function SettingsScreen() {
     setStatus(null);
     try {
       const result = await checkConnection(trimmed());
-      if (result.canPush) {
-        setStatus({ ok: true, message: `Conectado a ${result.fullName} com permissão de escrita.` });
-      } else if (form.token.trim()) {
+      if (!form.token.trim()) {
+        setStatus({ ok: true, message: `Conectado a ${result.fullName}. Sem token, só é possível ler.` });
+      } else if (result.tokenCanWrite) {
+        setStatus({ ok: true, message: `Conectado a ${result.fullName}. O token tem permissão para enviar receitas.` });
+      } else if (result.tokenCanWrite === false) {
         setStatus({
           ok: false,
-          message: `Conectado a ${result.fullName}, mas o token não tem permissão de escrita (Contents: Read and write).`,
+          message: `Conectado a ${result.fullName}, mas o token não pode enviar receitas. ${result.writeError ?? ''}`,
         });
       } else {
-        setStatus({ ok: true, message: `Conectado a ${result.fullName}. Sem token, só é possível ler.` });
+        setStatus({
+          ok: false,
+          message: `Conectado a ${result.fullName}, mas não foi possível confirmar a permissão de escrita do token. ${result.writeError ?? ''}`,
+        });
       }
     } catch (e) {
       setStatus({ ok: false, message: e instanceof Error ? e.message : String(e) });
