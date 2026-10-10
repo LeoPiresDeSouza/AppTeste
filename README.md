@@ -47,6 +47,10 @@ Para ativar (uma única vez):
 
 O APK pode ser gerado nos servidores do Expo com o [EAS Build](https://docs.expo.dev/build/introduction/), que exige uma conta gratuita no Expo.
 
+## Backlog
+
+Melhorias planejadas e pendências conhecidas estão em [`docs/BACKLOG.md`](docs/BACKLOG.md).
+
 ## Desenvolvimento
 
 ```bash
