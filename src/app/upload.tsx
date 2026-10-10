@@ -8,7 +8,7 @@ import { Button } from '../lib/Button';
 import { formatSize, slugify, timestamp } from '../lib/files';
 import { uploadRecipe } from '../lib/github';
 import { base64Size, prepareImage } from '../lib/image';
-import { readFileAsBase64 } from '../lib/read-file';
+import { localFileUri, readFileAsBase64 } from '../lib/read-file';
 import { useSettings } from '../lib/settings';
 import { colors, common } from '../lib/theme';
 
@@ -34,11 +34,13 @@ export default function UploadScreen() {
     const asset = result.assets[0];
     setBusy('preparing');
     try {
-      const image = await prepareImage(asset).catch((e) => {
-        const info = [asset.fileName, asset.mimeType, asset.fileSize && formatSize(asset.fileSize)].filter(Boolean);
-        const message = e instanceof Error ? e.message : String(e);
-        throw new Error(info.length ? `${message} (arquivo: ${info.join(', ')})` : message);
-      });
+      const image = await localFileUri(asset)
+        .then((uri) => prepareImage({ ...asset, uri }))
+        .catch((e) => {
+          const info = [asset.fileName, asset.mimeType, asset.fileSize && formatSize(asset.fileSize)].filter(Boolean);
+          const message = e instanceof Error ? e.message : String(e);
+          throw new Error(info.length ? `${message} (arquivo: ${info.join(', ')})` : message);
+        });
       setSelected({
         kind: 'image',
         previewUri: image.uri,
@@ -91,7 +93,7 @@ export default function UploadScreen() {
       throw new Error(`O PDF tem ${formatSize(asset.size)}. O limite é ${formatSize(MAX_PDF_BYTES)}.`);
     }
     setBusy('preparing');
-    const base64 = await readFileAsBase64(asset.uri);
+    const base64 = await readFileAsBase64(await localFileUri(asset));
     setSelected({ kind: 'pdf', name: asset.name, base64, size: asset.size ?? base64Size(base64) });
     setBusy(null);
     // Sugere o nome do arquivo como título, se o usuário ainda não digitou um.

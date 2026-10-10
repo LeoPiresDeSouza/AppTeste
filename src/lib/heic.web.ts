@@ -1,3 +1,5 @@
+import { blobToDataUrl } from './read-file.web';
+
 /**
  * Converte fotos HEIC/HEIF (padrão de iPhones e de muitos Android) para JPEG.
  * Os navegadores, em geral, não conseguem abrir esse formato, então sem a
@@ -16,5 +18,5 @@ export async function convertHeicIfNeeded(
   const blob = await (await fetch(uri)).blob();
   const converted = await heic2any({ blob, toType: 'image/jpeg', quality: 0.85 });
   const jpeg = Array.isArray(converted) ? converted[0] : converted;
-  return { uri: URL.createObjectURL(jpeg), mimeType: 'image/jpeg' };
+  return { uri: await blobToDataUrl(jpeg), mimeType: 'image/jpeg' };
 }
