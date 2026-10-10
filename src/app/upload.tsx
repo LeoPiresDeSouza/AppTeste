@@ -25,13 +25,20 @@ export default function UploadScreen() {
   const [selected, setSelected] = useState<Selected | null>(null);
   const [busy, setBusy] = useState<'preparing' | 'sending' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Erro ao escolher/preparar o arquivo. Fica separado de `error` para não ser
+  // apagado quando o usuário toca em Enviar.
+  const [fileError, setFileError] = useState<string | null>(null);
 
   const handleImage = async (result: ImagePicker.ImagePickerResult) => {
     if (result.canceled) return;
     const asset = result.assets[0];
     setBusy('preparing');
     try {
-      const image = await prepareImage(asset);
+      const image = await prepareImage(asset).catch((e) => {
+        const info = [asset.fileName, asset.mimeType, asset.fileSize && formatSize(asset.fileSize)].filter(Boolean);
+        const message = e instanceof Error ? e.message : String(e);
+        throw new Error(info.length ? `${message} (arquivo: ${info.join(', ')})` : message);
+      });
       setSelected({
         kind: 'image',
         previewUri: image.uri,
@@ -44,21 +51,29 @@ export default function UploadScreen() {
     }
   };
 
-  const run = (action: () => Promise<void>) => async () => {
-    setError(null);
+  const run = (action: () => Promise<void>, onError = setError) => async () => {
+    onError(null);
     try {
       await action();
     } catch (e) {
       setBusy(null);
-      setError(e instanceof Error ? e.message : String(e));
+      onError(e instanceof Error ? e.message : String(e));
     }
   };
 
-  const pickFromGallery = run(async () => {
+  // Ao escolher um arquivo novo, os erros anteriores deixam de valer.
+  const pick = (action: () => Promise<void>) =>
+    run(async () => {
+      setError(null);
+      setSelected(null);
+      await action();
+    }, setFileError);
+
+  const pickFromGallery = pick(async () => {
     await handleImage(await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 }));
   });
 
-  const takePhoto = run(async () => {
+  const takePhoto = pick(async () => {
     if (Platform.OS !== 'web') {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
@@ -68,7 +83,7 @@ export default function UploadScreen() {
     await handleImage(await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 }));
   });
 
-  const pickPdf = run(async () => {
+  const pickPdf = pick(async () => {
     const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
     if (result.canceled) return;
     const asset = result.assets[0];
@@ -86,6 +101,7 @@ export default function UploadScreen() {
   const missing = [!title.trim() && 'o nome da receita', !selected && 'uma foto ou um PDF'].filter(Boolean);
 
   const send = run(async () => {
+    if (!selected && fileError) throw new Error('A foto ou o PDF escolhido não pôde ser usado. Veja o aviso acima.');
     if (!selected || !title.trim()) throw new Error(`Falta informar ${missing.join(' e ')}.`);
     const slug = slugify(title);
     if (!slug) throw new Error('O nome da receita precisa ter pelo menos uma letra ou número.');
@@ -141,6 +157,8 @@ export default function UploadScreen() {
           <Text style={[common.hint, styles.flex]}>Preparando arquivo... fotos grandes podem levar alguns segundos.</Text>
         </View>
       )}
+
+      {fileError && <Text style={common.error}>{fileError}</Text>}
 
       {selected?.kind === 'image' && (
         <View style={common.card}>

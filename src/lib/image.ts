@@ -1,5 +1,7 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import { Image } from 'react-native';
 
+import { convertHeicIfNeeded } from './heic';
 import { readFileAsBase64 } from './read-file';
 
 /** Fotos de celular passam fácil de 5 MB; 1600 px de largura ainda deixa a receita legível. */
@@ -19,7 +21,7 @@ const EXTENSION_BY_MIME: Record<string, string> = {
 
 export type PreparedImage = { uri: string; base64: string; extension: string };
 
-type PickedImage = { uri: string; width: number; mimeType?: string | null };
+type PickedImage = { uri: string; width: number; mimeType?: string | null; fileName?: string | null };
 
 /** Tamanho em bytes do arquivo representado por uma string base64. */
 export function base64Size(base64: string): number {
@@ -56,17 +58,30 @@ async function compress(uri: string, width: number): Promise<PreparedImage> {
  * demais, usa a foto original, desde que o formato e o tamanho permitam.
  */
 export async function prepareImage(picked: PickedImage): Promise<PreparedImage> {
+  let { uri, width, mimeType } = picked;
+
+  let converted: Awaited<ReturnType<typeof convertHeicIfNeeded>>;
   try {
-    return await withTimeout(compress(picked.uri, picked.width), COMPRESS_TIMEOUT_MS);
+    converted = await convertHeicIfNeeded(uri, mimeType, picked.fileName);
   } catch {
-    const extension = EXTENSION_BY_MIME[picked.mimeType ?? ''] ?? (picked.mimeType ? null : 'jpg');
+    throw new Error('Não foi possível converter a foto do formato HEIC. Tente uma captura de tela da foto.');
+  }
+  if (converted) {
+    ({ uri, mimeType } = converted);
+    width = await new Promise<number>((resolve) => Image.getSize(uri, (w) => resolve(w), () => resolve(0)));
+  }
+
+  try {
+    return await withTimeout(compress(uri, width), COMPRESS_TIMEOUT_MS);
+  } catch {
+    const extension = EXTENSION_BY_MIME[mimeType ?? ''] ?? (mimeType ? null : 'jpg');
     if (!extension) {
-      throw new Error('Não foi possível usar esta imagem. Escolha uma foto em JPEG ou PNG.');
+      throw new Error(`O formato desta imagem (${mimeType}) não é suportado. Escolha uma foto em JPEG ou PNG.`);
     }
-    const base64 = await readFileAsBase64(picked.uri);
+    const base64 = await readFileAsBase64(uri);
     if (base64Size(base64) > MAX_ORIGINAL_BYTES) {
       throw new Error('A foto é grande demais e não pôde ser reduzida. Tente uma foto menor ou uma captura de tela.');
     }
-    return { uri: picked.uri, base64, extension };
+    return { uri, base64, extension };
   }
 }
