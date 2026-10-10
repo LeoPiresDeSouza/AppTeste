@@ -199,7 +199,17 @@ export default function UploadScreen() {
           <Button title="📁 Arquivos" variant="secondary" onPress={pickFromFiles} disabled={!!busy} />
         </View>
       </View>
-      <Text style={common.hint}>Foto ou PDF no Google Drive? Use 📁 Arquivos e escolha o Drive na lista.</Text>
+      <Text style={common.hint}>
+        Foto ou PDF no Google Drive ou no Google Fotos?{' '}
+        <Text
+          accessibilityRole="link"
+          style={styles.link}
+          onPress={busy ? undefined : pickFromFiles}
+        >
+          Toque aqui para abrir Arquivos
+        </Text>{' '}
+        e escolha Drive ou Fotos no menu ☰.
+      </Text>
 
       {busy === 'preparing' && (
         <View style={[styles.row, styles.centerRow]}>
@@ -248,4 +258,5 @@ const styles = StyleSheet.create({
   pdfName: { fontSize: 16, fontWeight: '600', color: colors.text },
   bigIcon: { fontSize: 48 },
   center: { textAlign: 'center' },
+  link: { color: colors.primary, fontWeight: '600', textDecorationLine: 'underline' },
 });
