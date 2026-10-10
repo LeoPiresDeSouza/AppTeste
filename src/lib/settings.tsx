@@ -15,8 +15,8 @@ export type Settings = {
 export const DEFAULT_SETTINGS: Settings = {
   token: '',
   owner: 'LeoPiresDeSouza',
-  repo: 'recipes',
-  branch: 'master',
+  repo: 'Receitas',
+  branch: 'main',
   folder: 'uploads',
 };
 

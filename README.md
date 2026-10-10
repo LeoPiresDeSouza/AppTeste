@@ -1,7 +1,7 @@
 # Receitas
 
 App mobile (Android, iOS e web) para administrar receitas guardadas num repositório do GitHub.
-Por padrão ele usa o repositório [`LeoPiresDeSouza/recipes`](https://github.com/LeoPiresDeSouza/recipes).
+Por padrão ele usa o repositório [`LeoPiresDeSouza/Receitas`](https://github.com/LeoPiresDeSouza/Receitas), branch `main`.
 
 ## Funcionalidades
 

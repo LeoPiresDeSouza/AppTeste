@@ -105,12 +105,27 @@ type TreeResponse = {
   truncated: boolean;
 };
 
-/** Lista todas as receitas (texto, imagem e PDF) do repositório, inclusive em subpastas. */
-export async function listRecipes(settings: Settings): Promise<RecipeEntry[]> {
-  const data = await request<TreeResponse>(
+/** O GitHub responde 409 ao ler a árvore de um repositório sem nenhum commit. */
+function isEmptyRepoError(error: unknown): boolean {
+  return error instanceof GitHubError && error.status === 409;
+}
+
+async function getTree(settings: Settings): Promise<TreeResponse> {
+  return request<TreeResponse>(
     settings,
     `${repoPath(settings)}/git/trees/${encodeURIComponent(settings.branch)}?recursive=1`,
   );
+}
+
+/** Lista todas as receitas (texto, imagem e PDF) do repositório, inclusive em subpastas. */
+export async function listRecipes(settings: Settings): Promise<RecipeEntry[]> {
+  let data: TreeResponse;
+  try {
+    data = await getTree(settings);
+  } catch (error) {
+    if (isEmptyRepoError(error)) return [];
+    throw error;
+  }
   return data.tree
     .filter((item) => item.type === 'blob')
     .filter((item) => !item.path.split('/').some((part) => part.startsWith('.')))
@@ -156,10 +171,23 @@ export async function uploadRecipe(
   base64: string,
   message: string,
 ): Promise<void> {
-  await request(settings, `${repoPath(settings)}/contents/${contentPath(path)}`, {
-    method: 'PUT',
-    body: JSON.stringify({ message, content: base64, branch: settings.branch }),
-  });
+  const put = (body: object) =>
+    request(settings, `${repoPath(settings)}/contents/${contentPath(path)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ message, content: base64, ...body }),
+    });
+  try {
+    await put({ branch: settings.branch });
+  } catch (error) {
+    // Num repositório vazio o branch ainda não existe. Nesse caso o primeiro
+    // arquivo vai sem branch, e o GitHub cria o commit inicial no branch padrão.
+    const repoIsEmpty = await getTree(settings).then(
+      () => false,
+      (treeError) => isEmptyRepoError(treeError),
+    );
+    if (!repoIsEmpty) throw error;
+    await put({});
+  }
 }
 
 type RepoResponse = {

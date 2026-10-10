@@ -21,8 +21,8 @@ const FIELDS: Field[] = [
     secret: true,
   },
   { key: 'owner', label: 'Dono do repositório', placeholder: 'LeoPiresDeSouza' },
-  { key: 'repo', label: 'Repositório', placeholder: 'recipes' },
-  { key: 'branch', label: 'Branch', placeholder: 'master' },
+  { key: 'repo', label: 'Repositório', placeholder: 'Receitas' },
+  { key: 'branch', label: 'Branch', placeholder: 'main' },
   { key: 'folder', label: 'Pasta das receitas novas', placeholder: 'uploads', hint: 'Deixe vazio para a raiz.' },
 ];
 
