@@ -1,5 +1,4 @@
 import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -8,8 +7,6 @@ import { checkConnection } from '../lib/github';
 import { Settings, useSettings } from '../lib/settings';
 import { colors, common } from '../lib/theme';
 
-const NEW_TOKEN_URL = 'https://github.com/settings/personal-access-tokens/new';
-
 type Field = { key: keyof Settings; label: string; placeholder: string; hint?: string; secret?: boolean };
 
 const FIELDS: Field[] = [
@@ -17,7 +14,11 @@ const FIELDS: Field[] = [
     key: 'token',
     label: 'Token do GitHub',
     placeholder: 'github_pat_...',
-    hint: 'Necessário apenas para enviar receitas.',
+    hint:
+      'Necessário apenas para enviar receitas. ' +
+      (Platform.OS === 'web'
+        ? 'Fica salvo apenas neste navegador.'
+        : 'Fica salvo apenas neste aparelho, no armazenamento seguro do sistema.'),
     secret: true,
   },
   { key: 'owner', label: 'Dono do repositório', placeholder: 'LeoPiresDeSouza' },
@@ -109,27 +110,10 @@ export default function SettingsScreen() {
 
       <Button title="Testar conexão" variant="secondary" onPress={onCheck} loading={busy === 'checking'} />
       <Button title="Salvar" onPress={onSave} loading={busy === 'saving'} />
-
-      <View style={[common.card, styles.help]}>
-        <Text style={common.label}>Como criar o token</Text>
-        <Text style={common.hint}>
-          1. Abra a página de tokens do GitHub (botão abaixo).{'\n'}
-          2. Em "Repository access", escolha "Only select repositories" e selecione o repositório de receitas.{'\n'}
-          3. Em "Permissions → Repository permissions", defina "Contents" como "Read and write".{'\n'}
-          4. Gere o token, copie e cole no campo acima.
-        </Text>
-        <Text style={common.hint}>
-          {Platform.OS === 'web'
-            ? 'Na versão web o token fica salvo apenas neste navegador.'
-            : 'O token fica salvo apenas neste aparelho, no armazenamento seguro do sistema.'}
-        </Text>
-        <Button title="Criar token no GitHub" variant="secondary" onPress={() => WebBrowser.openBrowserAsync(NEW_TOKEN_URL)} />
-      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   field: { gap: 6 },
-  help: { gap: 10, marginTop: 8 },
 });
