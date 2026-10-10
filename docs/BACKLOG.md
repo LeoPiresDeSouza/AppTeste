@@ -38,13 +38,36 @@ Melhorias e pendências conhecidas do app de receitas, por prioridade. Ao conclu
 
 **Esforço estimado:** médio (manifesto, service worker e ajuste na tela de upload).
 
+### 2. Voltar a usar token fine-grained (segurança)
+
+**Situação atual.** O token *fine-grained* não funcionou no envio de receitas. Para seguir em frente, foi criado um token **clássico**, que dá acesso a vários repositórios ao mesmo tempo. Se ele vazar, o estrago vai além do `Receitas`.
+
+**Medida imediata (enquanto o item não é resolvido).** No token clássico, em <https://github.com/settings/tokens>:
+
+- usar só o escopo **`public_repo`** (não `repo`), o que tira o acesso aos repositórios privados;
+- definir uma **data de expiração**.
+
+**O que investigar no fine-grained.**
+
+- [ ] Em **Repository access → Only select repositories**, o `LeoPiresDeSouza/Receitas` está selecionado.
+- [ ] Em **Permissions → Repository permissions** (e não em *Account permissions*), **Contents** está como **Read and write**.
+- [ ] As alterações foram salvas com **Update**.
+- [ ] O token foi criado na conta dona do repositório (`LeoPiresDeSouza`), com **Resource owner** igual a essa conta.
+- [ ] Anotar a mensagem exata que o app mostra em **Testar conexão** e no envio. Desde o commit `8aca282`, o app mostra o texto do GitHub.
+
+**Critérios de aceite.**
+
+- [ ] Envio de foto e de PDF funcionando com um token fine-grained restrito ao `Receitas`.
+- [ ] Token clássico **revogado**.
+- [ ] Se for limitação do app, e não da configuração do token, corrigir o app e registrar a causa aqui.
+
 ## Prioridade média
 
-### 2. Manter acentos no nome das receitas enviadas
+### 3. Manter acentos no nome das receitas enviadas
 
 O nome exibido vem do nome do arquivo, que não tem acentos: "Bolo de Cenoura da Vó" aparece como "Bolo de cenoura da vo". Possível solução: guardar o título original, por exemplo num arquivo `receitas.json` no repositório ou na mensagem do commit, e usá-lo na lista.
 
-### 3. Testar e publicar o app nativo (Android)
+### 4. Testar e publicar o app nativo (Android)
 
 A versão nativa nunca foi testada num aparelho. Pontos a validar:
 
@@ -54,17 +77,17 @@ A versão nativa nunca foi testada num aparelho. Pontos a validar:
 
 Gerar o APK com EAS Build (requer conta no Expo).
 
-### 4. Rodar o lint do projeto
+### 5. Rodar o lint do projeto
 
 `npx expo lint` não foi executado porque o ambiente de desenvolvimento usado até agora bloqueia o servidor do Expo de onde a configuração seria instalada. Configurar o ESLint (`eslint-config-expo`) e incluir o lint no workflow de publicação.
 
 ## Prioridade baixa
 
-### 5. Testes automatizados no repositório
+### 6. Testes automatizados no repositório
 
 Os testes ponta a ponta (Playwright, com a API do GitHub simulada) foram rodados apenas no ambiente de desenvolvimento, fora do repositório. Trazê-los para o projeto e rodá-los no GitHub Actions antes da publicação.
 
-### 6. Editar e excluir receitas
+### 7. Editar e excluir receitas
 
 Hoje o app só lista, visualiza e adiciona receitas. Avaliar renomear e excluir arquivos pela API de conteúdo do GitHub.
 
@@ -77,3 +100,4 @@ Hoje o app só lista, visualiza e adiciona receitas. Avaliar renomear e excluir 
 | 2026-10-10 | Leitura direta do arquivo (corrige "Failed to fetch") | `c42d56a` |
 | 2026-10-10 | Botão **📁 Arquivos** para fotos e PDFs do Google Drive | `c1e3e00` |
 | 2026-10-10 | Texto de ajuda com link para abrir Arquivos | `7a6c93e` |
+| 2026-10-10 | "Testar conexão" verifica a permissão real do token; erros 403 detalhados | `8aca282` |
