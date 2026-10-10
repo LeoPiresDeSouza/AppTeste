@@ -15,6 +15,21 @@ import { colors, common } from '../lib/theme';
 /** A API de conteúdo do GitHub não lida bem com arquivos maiores que isso. */
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
 
+type PickedFile = {
+  uri: string;
+  file?: File;
+  mimeType?: string | null;
+  fileName?: string | null;
+  fileSize?: number | null;
+};
+
+/** Acrescenta nome, tipo e tamanho do arquivo à mensagem de erro, para facilitar o diagnóstico. */
+function withFileInfo(error: unknown, name?: string | null, mimeType?: string | null, size?: number | null): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  const info = [name, mimeType, size && formatSize(size)].filter(Boolean);
+  return new Error(info.length ? `${message} (arquivo: ${info.join(', ')})` : message);
+}
+
 type Selected =
   | { kind: 'image'; previewUri: string; base64: string; size: number; extension: string }
   | { kind: 'pdf'; name: string; base64: string; size: number };
@@ -29,17 +44,13 @@ export default function UploadScreen() {
   // apagado quando o usuário toca em Enviar.
   const [fileError, setFileError] = useState<string | null>(null);
 
-  const handleImage = async (result: ImagePicker.ImagePickerResult) => {
-    if (result.canceled) return;
-    const asset = result.assets[0];
+  const loadImage = async (asset: PickedFile & { width: number }) => {
     setBusy('preparing');
     try {
       const image = await localFileUri(asset)
         .then((uri) => prepareImage({ ...asset, uri }))
         .catch((e) => {
-          const info = [asset.fileName, asset.mimeType, asset.fileSize && formatSize(asset.fileSize)].filter(Boolean);
-          const message = e instanceof Error ? e.message : String(e);
-          throw new Error(info.length ? `${message} (arquivo: ${info.join(', ')})` : message);
+          throw withFileInfo(e, asset.fileName, asset.mimeType, asset.fileSize);
         });
       setSelected({
         kind: 'image',
@@ -51,6 +62,25 @@ export default function UploadScreen() {
     } finally {
       setBusy(null);
     }
+  };
+
+  const handleImage = async (result: ImagePicker.ImagePickerResult) => {
+    if (result.canceled) return;
+    await loadImage(result.assets[0]);
+  };
+
+  const loadPdf = async (asset: DocumentPicker.DocumentPickerAsset) => {
+    if (asset.size && asset.size > MAX_PDF_BYTES) {
+      throw new Error(`O PDF tem ${formatSize(asset.size)}. O limite é ${formatSize(MAX_PDF_BYTES)}.`);
+    }
+    setBusy('preparing');
+    const base64 = await readFileAsBase64(await localFileUri(asset)).catch((e) => {
+      throw withFileInfo(e, asset.name, asset.mimeType, asset.size);
+    });
+    setSelected({ kind: 'pdf', name: asset.name, base64, size: asset.size ?? base64Size(base64) });
+    setBusy(null);
+    // Sugere o nome do arquivo como título, se o usuário ainda não digitou um.
+    setTitle((current) => current || asset.name.replace(/\.pdf$/i, ''));
   };
 
   const run = (action: () => Promise<void>, onError = setError) => async () => {
@@ -87,17 +117,27 @@ export default function UploadScreen() {
 
   const pickPdf = pick(async () => {
     const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
+    if (!result.canceled) await loadPdf(result.assets[0]);
+  });
+
+  // Abre o gerenciador de arquivos do sistema em vez da galeria. Nele aparecem
+  // o Google Drive e outras nuvens, e o próprio sistema baixa o arquivo antes
+  // de entregá-lo ao app — o que a galeria do navegador não faz.
+  const pickFromFiles = pick(async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['image/*', 'application/pdf'],
+      copyToCacheDirectory: true,
+    });
     if (result.canceled) return;
     const asset = result.assets[0];
-    if (asset.size && asset.size > MAX_PDF_BYTES) {
-      throw new Error(`O PDF tem ${formatSize(asset.size)}. O limite é ${formatSize(MAX_PDF_BYTES)}.`);
+    const mime = asset.mimeType ?? '';
+    if (mime === 'application/pdf' || /\.pdf$/i.test(asset.name)) {
+      await loadPdf(asset);
+    } else if (mime.startsWith('image/') || /\.(jpe?g|png|webp|gif|hei[cf])$/i.test(asset.name)) {
+      await loadImage({ ...asset, width: 0, fileName: asset.name, fileSize: asset.size });
+    } else {
+      throw new Error(`Escolha uma foto ou um PDF (o arquivo "${asset.name}" não é nenhum dos dois).`);
     }
-    setBusy('preparing');
-    const base64 = await readFileAsBase64(await localFileUri(asset));
-    setSelected({ kind: 'pdf', name: asset.name, base64, size: asset.size ?? base64Size(base64) });
-    setBusy(null);
-    // Sugere o nome do arquivo como título, se o usuário ainda não digitou um.
-    setTitle((current) => current || asset.name.replace(/\.pdf$/i, ''));
   });
 
   const missing = [!title.trim() && 'o nome da receita', !selected && 'uma foto ou um PDF'].filter(Boolean);
@@ -151,7 +191,15 @@ export default function UploadScreen() {
           <Button title="📷 Câmera" variant="secondary" onPress={takePhoto} disabled={!!busy} />
         </View>
       </View>
-      <Button title="📕 Escolher PDF" variant="secondary" onPress={pickPdf} disabled={!!busy} />
+      <View style={styles.row}>
+        <View style={styles.flex}>
+          <Button title="📕 PDF" variant="secondary" onPress={pickPdf} disabled={!!busy} />
+        </View>
+        <View style={styles.flex}>
+          <Button title="📁 Arquivos" variant="secondary" onPress={pickFromFiles} disabled={!!busy} />
+        </View>
+      </View>
+      <Text style={common.hint}>Foto ou PDF no Google Drive? Use 📁 Arquivos e escolha o Drive na lista.</Text>
 
       {busy === 'preparing' && (
         <View style={[styles.row, styles.centerRow]}>

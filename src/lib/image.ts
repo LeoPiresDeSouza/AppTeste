@@ -68,6 +68,10 @@ export async function prepareImage(picked: PickedImage): Promise<PreparedImage> 
   }
   if (converted) {
     ({ uri, mimeType } = converted);
+    width = 0;
+  }
+  // Arquivos escolhidos fora da galeria (ex.: Google Drive) chegam sem largura.
+  if (!width) {
     width = await new Promise<number>((resolve) => Image.getSize(uri, (w) => resolve(w), () => resolve(0)));
   }
 
